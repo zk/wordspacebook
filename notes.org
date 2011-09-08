@@ -24,8 +24,6 @@ Choices:
 Prob sparse graph
 
 
-
-
 30s run time for brute force
 
 Not feasable for check all
@@ -190,3 +188,9 @@ Looks like we need to write our own levenshtein.
 
 foo
 fooo
+
+Phew, went from 95s to .9s for 9 letter words using the short-circuit
+levenstein.  Still too long, but we're getting there.
+
+Ok, so we've got step 1 down, finding all words that are 1 degree away
+from the target word.  Now we build our adjacency lists.
