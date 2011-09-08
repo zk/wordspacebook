@@ -1,0 +1,192 @@
+<2011-09-07 Wed 18:50>
+
+Concerns:
+
++ What if the list is too big to fit in memory?
++ What if the list changes?
+
+Choices:
+
++ 2.6 meg is fine in memory
++ List isn't changing
++ No dupes, use a set for O(1) lookup
++ Roll through once
++ Need a lookup mechanism
++ Graph representation
++ Adjacency list
+
+# Improvements
+
++ Better leven implementation
+
+264061 words
+
+Prob sparse graph
+
+
+
+
+30s run time for brute force
+
+Not feasable for check all
+
+one level means those words are removed?
+
+root word is removed from list, reversals are added
+
+Does calculating leven for w1 and w2 tell us anything about w3?
+
+If w1 and w2 have a distance of 5 and w2 and w3 have a distance of 3,
+does that tell us anything?
+
+Yes? An edit distance of 1 from w1 to w2 and an edit distance of 1
+from w2 to w3 means it's an edit distance of <= 2 from w1 to w3.
+
+But you'd still have to check them all.  My initial thought was to use
+the existing graph to short circuit.
+
+leven is black box at this point
+
+remove elements from list in graph?
+
+Lets check the incanter impl.
+
+Ah, words that are 1 apart are themselves 1 apart?
+
+bar -> [baz, bap, bor]
+baz -> [bar]
+bap -> [bar]
+bor -> [bar]
+
+But, then bar can be removed.
+
+# Short Curcuits
+
+Once bar is processed, it can be removed.
+
+If 2 strings have a length difference > 1, they can't be friends
+
+
+Pre-length-cull:
+
+(defn find-buddies-v1 [s coll]
+  (loop [rem coll
+         matches []]
+    (cond
+     (empty? rem) matches
+     (= 1 (leven s (first rem))) (recur (rest rem) (conj matches (first rem)))
+     :else (recur (rest rem) matches))))
+
+;=> 32s
+
+32s * 250k = 130k minutes = 2k hours = 92 days
+
+Post-length-cull:
+
+(defn find-buddies-v2 [s coll]
+  (let [coll (filter #(< (Math/abs (- (count s) (count %))) 2) coll)]
+    (loop [rem coll
+           matches []]
+      (cond
+       (empty? rem) matches
+       (= 1 (leven s (first rem))) (recur (rest rem) (conj matches (first rem)))
+       :else (recur (rest rem) matches)))))
+
+;=> 200ms
+
+Score, 30s -> .2s
+Are they equal? Yes!
+
+Still, to do this for 250k would be ~904 minutes = 15 hours, not
+acceptable.
+
+Can I cache the lists?
+
+Need to cull further, 95k entries for a word length of 10
+
+Hrm, first & last characters
+
+If equal size\
+
+(defn find-length-possibles [s coll]
+  (filter #(< (Math/abs (- (count s) (count %))) 2) coll))
+
+(doseq [w (->> (range 1 40)
+               (map #(repeat % "a"))
+               (map #(apply str %)))]
+  (println (count w) (count (find-length-possibles w word-list))))
+
+ 1 123                                                                                                                                                                                                       
+ 2 1378                                                                                                                                                                                                      
+ 3 6626                                                                                                                                                                                                      
+ 4 18536                                                                                                                                                                                                     
+ 5 38711                                                                                                                                                                                                     
+ 6 65508                                                                                                                                                                                                     
+ 7 92755                                                                                                                                                                                                     
+ 8 109639                                                                                                                                                                                                    
+ 9 111271                                                                                                                                                                                                    
+10 98638                                                                                                                                                                                                    
+11 79825                                                                                                                                                                                                    
+12 59512                                                                                                                                                                                                    
+13 41624                                                                                                                                                                                                    
+14 27562                                                                                                                                                                                                    
+15 17439                                                                                                                                                                                                    
+16 10476                                                                                                                                                                                                    
+17 6005                                                                                                                                                                                                     
+18 3272                                                                                                                                                                                                     
+19 1720                                                                                                                                                                                                     
+20 851                                                                                                                                                                                                      
+21 383                                                                                                                                                                                                      
+22 161                                                                                                                                                                                                      
+23 77                                                                                                                                                                                                       
+24 40                                                                                                                                                                                                       
+25 18                                                                                                                                                                                                       
+26 5                                                                                                                                                                                                        
+27 4                                                                                                                                                                                                        
+28 6                                                                                                                                                                                                        
+29 5                                                                                                                                                                                                        
+30 4                                                                                                                                                                                                        
+31 3                                                                                                                                                                                                        
+32 2                                                                                                                                                                                                        
+33 1
+Do their equivalents hash?
+
+If they're not the same length, then substrs must match
+
+Check above and below list
+
+filter above and below by exact match
+
++ if not same length, then one has to be a substr of the other
++ if same length, only one char can be different
+
+Is substr faster than leven? Guessing yes
+
+Buckets:
+
+same
+cdec
+cinc
+
+cdec % substr s? then friend, else not friend
+
+Another tact, only exit leven at diff > 1
+
+Even with the culling to running leven on equal length strings only,
+still too long.
+
+Ok, lets write our own leven, knowing that:
++ Equal length strings can only have 1 differing character
++ Unequal length strings can only differ in length by 1, and all
+  characters of the longer string - 1 must match exactly the shorter
+  string.
++ hash shorter == hash longer - last char or hash shorter == hash
+  longer - first char
++ We'd like to pre-process this as much as possible.
+
+Looks like we need to write our own levenshtein.
+
+
+
+foo
+fooo
