@@ -194,3 +194,75 @@ levenstein.  Still too long, but we're getting there.
 
 Ok, so we've got step 1 down, finding all words that are 1 degree away
 from the target word.  Now we build our adjacency lists.
+
+
+make-graph for 1k elements => 1s
+make-graph 10k elements => 113s
+
+no good...
+
+Need to take a look at my alg book
+
+Can it be done in 1 pass?
+
+Need a O(1) lookup for all buddies 
+
+Could fire up the profiler...
+
+foo -> fo foo foa fob foc
+
+200% speedup using word map
+
+
+Ok, the list is already sorted, can we do something with that?
+
+aa
+ab
+ac
+
+foc
+fod
+foo
+
+
+found the prob, words aren't being removed from word-map
+
+So still too slow, 20s for 4k entries, and still polynomial time.
+
+Really should look at my alg book.
+
+foo -> foa fob foc fod
+foa -> foo
+fob -> foo 
+foc -> foo
+fod -> foo
+
+Need to narrow the search space even more,
+
+Chop down each string per pass?
+
+
+Bitwise check is slower?!
+
+Suffix Tree?
+
+Suffix Graph?
+
+
+causes
+causea
+causeba
+
+foobar
+
+foobaz
+baz
+
+Fundamentally n2, because you (worst case) have to check every word
+against every other word.  This also inhibits parallelism. So, moving
+on to tricks.
+
+However, if it's sparsely connected, then it might not be so bad.
+
+So, we switch from trying to build the entire graph, to trying to
+build and traverse only the part of the graph we need.
