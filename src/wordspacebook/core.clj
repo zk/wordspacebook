@@ -2,11 +2,13 @@
   (:require [clojure.string :as str])
   (:use [incanter.stats :only (levenshtein-distance)]))
 
+(set! *warn-on-reflection* true)
+
 (defn filter-length [l coll]
   (filter #(= l (count %)) coll))
 
 (defn make-word-map
-  "Pre-process word list to return a map of "
+  "Pre-process word list to return a map of char-length -> [words]"
   [coll]
   (->> (range 1 32)
        (map #(vector % (set (filter-length % coll))))
@@ -24,7 +26,7 @@
 (defn off-by-one? [s1 s2]
   (= (Math/abs (- (count s1) (count s2))) 1))
 
-(defn substr? [longer shorter]
+(defn substr? [^String longer ^String shorter]
   (.contains longer shorter))
 
 (defn substr-hash-match? [s1 s2]
@@ -33,6 +35,7 @@
         shorter (if (< len1 len2) s1 s2)
         longer (if (< len1 len2) s2 s1)]
     (substr? longer shorter)))
+
 
 (defn one-char-delta? [num-diff s1 s2]
   (loop [num-diff num-diff
@@ -44,20 +47,6 @@
      (empty? s2) (<= (+ num-diff (count s1)) 1)
      (= (first s1) (first s2)) (recur num-diff (rest s1) (rest s2))
      :else (recur (inc num-diff) (rest s1) (rest s2)))))
-
-(defn one-char-delta? [_ s1 s2]
-  (let [b1 (.getBytes s1)
-        b2 (.getBytes s2)]
-    (loop [num-diff 0
-           b1 b1
-           b2 b2]
-      (cond
-       (> num-diff 1) false
-       (= 0 (count b1)) (<= (+ num-diff (count b2)))
-       (= 0 (count b2)) (<= (+ num-diff (count b1)))
-       (> (bit-xor (first b1) (first b2)) 0) (recur (inc num-diff) (rest b1) (rest b2))
-       :else (recur num-diff (rest b1) (rest b2))))))
-
 
 (defn friend? [s1 s2]
   (cond
@@ -100,7 +89,13 @@
 
 (def word-list (set y))
 
-(def word-map (make-word-map word-list))
+(def word-vec-list (set (map vec y)))
+
+(def word-map (make-word-map word-list-sorted))
+
+(def word-vec-map (make-word-map word-vec-list))
+
+#_(get word-map 3)
 
 #_(time (nil? (make-graph (set (take 3000 word-list)))))
 
@@ -117,15 +112,30 @@
 ;;;;
 
 (defn network-for [word word-map levels max-levels]
-  (let [friends (find-friends word word-map)]
+  (let [word-map (remove-from-word-map word word-map)
+        friends (find-friends word word-map)]
     (cond
      (>= levels max-levels) {word friends}
      :else (->> friends
-                (map #(network-for % (remove-from-word-map % word-map) (inc levels) max-levels))
+                (pmap #(network-for % (remove-from-word-map % word-map) (inc levels) max-levels))
                 (reduce merge {word friends})))))
 
+(def output-dir "./graph")
 
-(defn network-for)
+(defn word-path [word]
+  (str output-dir "/" word))
+
+(defn write-word-file [word word-map]
+  (spit (word-path word) (pr-str (find-friends word word-map))))
+
+#_(write-word-file (first word-list-sorted) word-map)
+
+(let [idx 7
+      total (count (get word-map idx))]
+  (println "Running on idx" idx ":" total)
+  (time (doall (pmap #(write-word-file % word-map) (get word-map idx))))
+  (println "Done."))
+
 
 (defn count-network [network]
   (->> network
@@ -133,5 +143,7 @@
        (reduce +)))
 
 (use 'clojure.pprint)
-#_(time (pprint (count-network (network-for "causes" word-map 0 2))))
+#_(time (pprint (count-network (network-for "causes" word-map 0 3))))
+#_(time (pprint (count-network (network-for (vec "causes") word-vec-map 0 1))))
+
 
