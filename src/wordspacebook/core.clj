@@ -130,10 +130,9 @@
 
 #_(write-word-file (first word-list-sorted) word-map)
 
-(let [idx 7
-      total (count (get word-map idx))]
-  (println "Running on idx" idx ":" total)
-  (time (doall (pmap #(write-word-file % word-map) (get word-map idx))))
+(let [total (count word-list-sorted)]
+  (println "Running complete make graph :" total)
+  (time (doall (pmap #(write-word-file % word-map) word-list-sorted)))
   (println "Done."))
 
 
